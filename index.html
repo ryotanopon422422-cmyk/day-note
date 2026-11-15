@@ -110,6 +110,13 @@ aside h3.sumh{margin-top:30px}
 #sheet.v-plan .k-actual,#sheet.v-actual .k-plan{display:none}
 .colhead{position:sticky;top:0;z-index:6;background:var(--paper);border-bottom:1px solid var(--rule-hour);padding:16px 14px 6px;font-family:var(--hand);font-weight:600;font-size:18px;display:flex;align-items:baseline;gap:8px}
 .colhead .tot{margin-left:auto;font-size:11.5px;color:var(--pencil);font-family:var(--ui);font-weight:400}
+.colhead .colbtn{font-family:var(--ui);font-weight:700;font-size:12px;padding:5px 9px;border:1px solid #b9c1cc;border-radius:3px;background:var(--paper);align-self:center}
+.colhead .tot+.colbtn{margin-left:8px}
+.bulk-opts{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.bulk-opt{display:flex;align-items:baseline;justify-content:space-between;gap:10px;width:100%;text-align:left;padding:14px 14px;border:1px solid #c9d1db;border-radius:4px;background:var(--paper);font-size:15px;font-weight:700;white-space:normal}
+.bulk-opt small{font-weight:400;font-size:12px;color:var(--ink-soft);white-space:nowrap}
+.bulk-opt:disabled{color:var(--pencil);border-style:dashed;cursor:default;background:transparent}
+.bulk-note{font-size:12px;color:var(--ink-soft);line-height:1.7;margin:12px 0 0}
 .colhead.g{border-right:1px solid var(--red);padding:0}
 .colhead.k-actual,.body.k-actual{border-left:1px solid var(--rule-hour)}
 .gutter{position:relative;border-right:1px solid var(--red);height:calc(var(--slot) * 288)}
@@ -229,6 +236,9 @@ aside h3.sumh{margin-top:30px}
   .more.open{display:flex}
   .more button{text-align:left;padding:10px 12px}
   .hint,.keys{display:none}
+  .colhead{white-space:nowrap;padding:12px 8px 6px;font-size:17px}
+  .colhead .tot{display:none}
+  .colhead .colbtn{margin-left:auto;font-size:11.5px;padding:5px 7px}
 }
 /* standalone app: full height + iPhone safe areas */
 body{height:100dvh}
@@ -265,7 +275,7 @@ header{padding-top:max(12px,env(safe-area-inset-top));padding-left:max(22px,env(
     <button id="bMore" aria-expanded="false" aria-controls="more">その他</button>
     <div class="more" id="more">
       <button id="bPrevCopy" title="前日の「予定」を今日の予定に追加">前日の予定を写す</button>
-      <button id="bPlan2Act" title="予定をすべて実績に写す">予定を実績へ写す</button>
+      <button id="bPlan2Act" title="予定をまとめて実績に写す">実績へまとめて写す</button>
       <button id="bText" title="1日の内容をテキストでコピー">文字でコピー</button>
       <button id="bWidgetSetup">ウィジェットの設定</button>
       <button id="bExport" title="すべての記録をファイルに保存">バックアップを保存</button>
@@ -291,7 +301,7 @@ header{padding-top:max(12px,env(safe-area-inset-top));padding-left:max(22px,env(
   <section id="sheetWrap">
     <div id="sheet" class="v-both">
       <div class="colhead g"></div>
-      <div class="colhead k-plan">予定<span class="tot" id="totPlan"></span></div>
+      <div class="colhead k-plan">予定<span class="tot" id="totPlan"></span><button class="colbtn" id="bBulk" title="予定をまとめて実績に写す">実績へまとめて写す</button></div>
       <div class="colhead k-actual">実績<span class="tot" id="totActual"></span></div>
       <div class="gutter" id="gutter"></div>
       <div class="body k-plan" data-kind="plan"><div class="hover"><span></span></div></div>
@@ -353,6 +363,19 @@ header{padding-top:max(12px,env(safe-area-inset-top));padding-left:max(22px,env(
         <button class="primary" id="oSave">保存</button>
       </div>
     </div>
+  </div>
+</div>
+
+<div class="overlay" id="bulkDlg" role="dialog" aria-modal="true" aria-labelledby="bulkH">
+  <div class="dlg">
+    <h2 id="bulkH">実績へまとめて写す</h2>
+    <div class="bulk-opts">
+      <button class="bulk-opt" data-scope="done"><span>終わった予定</span><small></small></button>
+      <button class="bulk-opt" data-scope="sel"><span>選んでいる予定</span><small></small></button>
+      <button class="bulk-opt" data-scope="all"><span>この日の予定すべて</span><small></small></button>
+    </div>
+    <p class="bulk-note">予定はそのまま残り、同じ内容が実績に入ります。すでに実績にあるものは写しません。</p>
+    <div class="acts2"><div class="acts-main"><button class="line" id="bulkClose">やめる</button></div></div>
   </div>
 </div>
 
@@ -1096,15 +1119,42 @@ $('#bPrevCopy').addEventListener('click', async () => {
   S.day.plan.push(...prev.plan.map(e => ({...e, id:newId()})));
   commit(); toast(`前日の予定を${prev.plan.length}件写しました`);
 });
-$('#bPlan2Act').addEventListener('click', () => {
+// ---------- bulk copy: plan → actual ----------
+function bulkCandidates(scope){
   const key = e => `${e.title}|${e.start}|${e.end}`;
   const have = new Set(S.day.actual.map(key));
-  const add = S.day.plan.filter(e => !have.has(key(e)));
-  if (!add.length) { toast(S.day.plan.length ? '実績にはすでに写してあります' : '予定がありません'); return; }
+  let list = S.day.plan.filter(e => !have.has(key(e)));
+  if (scope === 'done') {
+    const t = todayStr();
+    if (S.date > t) list = [];
+    else if (S.date === t) { const n = new Date(), now = n.getHours()*60 + n.getMinutes(); list = list.filter(e => e.end <= now); }
+  } else if (scope === 'sel') list = list.filter(e => sel.has('plan:' + e.id));
+  return list.sort((a, b) => a.start - b.start);
+}
+function openBulk(){
+  document.querySelectorAll('#bulkDlg .bulk-opt').forEach(b => {
+    const n = bulkCandidates(b.dataset.scope).length;
+    b.querySelector('small').textContent = n ? `${n}件` : 'なし';
+    b.disabled = !n;
+  });
+  $('#more').classList.remove('open');
+  $('#bulkDlg').classList.add('open');
+}
+function runBulk(scope){
+  const add = bulkCandidates(scope);
+  $('#bulkDlg').classList.remove('open');
+  if (!add.length) return;
   pushUndo();
   S.day.actual.push(...add.map(e => ({...e, id:newId()})));
-  commit(); toast(`${add.length}件を実績に写しました。ずれた所は動かして直せます`);
-});
+  if (S.view === 'plan') { S.view = 'both'; applyView(); }
+  commit();
+  toast(`${add.length}件を実績に写しました（元に戻すで取り消せます）`);
+}
+$('#bBulk').addEventListener('click', openBulk);
+$('#bPlan2Act').addEventListener('click', openBulk);
+document.querySelectorAll('#bulkDlg .bulk-opt').forEach(b => b.addEventListener('click', () => runBulk(b.dataset.scope)));
+$('#bulkClose').addEventListener('click', () => $('#bulkDlg').classList.remove('open'));
+$('#bulkDlg').addEventListener('pointerdown', e => { if (e.target.id === 'bulkDlg') $('#bulkDlg').classList.remove('open'); });
 function dayText(){
   let t = fullDate(S.date) + '\n';
   KINDS.forEach(k => {
@@ -1127,6 +1177,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if ($('#evDlg').classList.contains('open')) cancelEditor();
     else if ($('#objDlg').classList.contains('open')) closeObj();
+    else if ($('#bulkDlg').classList.contains('open')) $('#bulkDlg').classList.remove('open');
     else if ($('#txtDlg').classList.contains('open')) $('#txtDlg').classList.remove('open');
     else if (sel.size) { sel.clear(); render(); }
     return;
