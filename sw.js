@@ -1,6 +1,6 @@
 // 1日ノート service worker: works offline after the first visit.
 // Bump VERSION whenever index.html changes so phones pick up the update.
-const VERSION = 'daynote-v2';
+const VERSION = 'daynote-v3';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
