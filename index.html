@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-<title>1日ノート — 5分刻みスケジュール</title>
+<title>1日ノート — 10分刻みスケジュール</title>
 <style>
 /* Direction: a Campus-style ruled notebook on a grey desk.
    Plans are written in blue-black ink; time blocks are drawn like mild highlighter strokes.
@@ -122,13 +122,13 @@ aside h3.sumh{margin-top:30px}
   background-image:
     linear-gradient(to bottom,var(--rule-hour) 1px,transparent 1px),
     linear-gradient(to bottom,var(--rule) 1px,transparent 1px);
-  background-size:100% calc(var(--slot)*12),100% calc(var(--slot)*3)}
+  background-size:100% calc(var(--slot)*12),100% calc(var(--slot)*2)}
 .z13 .body{background-image:
     linear-gradient(to bottom,var(--rule-hour) 1px,transparent 1px),
     linear-gradient(to bottom,var(--rule) 1px,transparent 1px),
     linear-gradient(to bottom,#edf2f7 1px,transparent 1px);
-  background-size:100% calc(var(--slot)*12),100% calc(var(--slot)*3),100% var(--slot)}
-.ev{position:absolute;background:color-mix(in srgb,var(--f) 42%,transparent);mix-blend-mode:multiply;padding:2px 7px;overflow:hidden;cursor:grab;touch-action:none;user-select:none;font-size:12px;line-height:1.35;z-index:2;
+  background-size:100% calc(var(--slot)*12),100% calc(var(--slot)*2),100% calc(var(--slot)*2)}
+.ev{position:absolute;background:color-mix(in srgb,var(--f) 42%,transparent);mix-blend-mode:multiply;padding:2px 7px;overflow:hidden;cursor:pointer;touch-action:auto;user-select:none;font-size:12px;line-height:1.35;z-index:2;
   clip-path:polygon(0 1px,100% 0,100% calc(100% - 1px),0 100%)}
 .ev .t{font-family:var(--hand);font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
 .ev .t span{background:linear-gradient(transparent 42%,var(--f) 42%,var(--f) 94%,transparent 94%);padding:0 3px;margin-left:-3px}
@@ -140,13 +140,13 @@ aside h3.sumh{margin-top:30px}
 .ev.short{display:flex;gap:8px;align-items:center;padding-top:0;padding-bottom:0}
 .ev.short .t{font-size:13px;flex:0 1 auto;min-width:0}
 .ev.tiny .t{font-size:10.5px}.ev.tiny .tm{display:none}
-.ev .hd{position:absolute;left:0;right:0;height:7px;cursor:ns-resize;z-index:1}
+.ev .hd{display:none;position:absolute;left:0;right:0;height:7px;cursor:ns-resize;z-index:1}
 .ev .hd.a{top:0}.ev .hd.b{bottom:0}
 .ev.sel{outline:1.5px solid var(--ink);outline-offset:-1.5px;clip-path:none;mix-blend-mode:normal;background:color-mix(in srgb,var(--f) 60%,var(--paper))}
 .ev.dragging{mix-blend-mode:normal;opacity:.92;outline:1px solid var(--ink);z-index:5;cursor:grabbing;clip-path:none}
 .ev.ghost{mix-blend-mode:normal;background:transparent;outline:1.5px dashed var(--ink-soft);outline-offset:-1.5px;pointer-events:none;z-index:4;clip-path:none}
 .ev.ghost .t.none{color:var(--ink-soft)}
-.hover{position:absolute;left:0;right:0;height:var(--slot);background:rgba(36,50,74,.05);pointer-events:none;display:none;z-index:1}
+.hover{position:absolute;left:0;right:0;height:calc(var(--slot)*2);background:rgba(36,50,74,.05);pointer-events:none;display:none;z-index:1}
 .hover span{position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:10.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
 .now{position:absolute;left:0;right:0;border-top:1.5px solid var(--red);z-index:3;pointer-events:none}
 
@@ -282,7 +282,7 @@ header{padding-top:max(12px,env(safe-area-inset-top));padding-left:max(22px,env(
     <p class="sub">タップで今の時刻から予定に入れます。ノートへドラッグで好きな時刻に配置、一覧の中で上下にドラッグで並び替え</p>
     <div id="palette"><div id="dropline"></div></div>
     <button class="addobj" id="bAddObj">＋ 追加</button>
-    <p class="hint">空いた行をなぞると、その時間で書けます。クリックなら30分。予定はクリックで選び、もう一度クリックすると直せます。掴んで動かし、下の端で長さを変えます。予定の列から実績の列へ運ぶと写せます。</p>
+    <p class="hint">空いた行をなぞると、その時間で書けます。クリックなら30分。予定はクリックで選び、もう一度クリックすると直せます。書いた予定は誤って動かないよう固定しています。時刻を変えるときは、開いた画面で直します。</p>
     <dl class="keys" id="keys"></dl>
     <h3 class="sumh">この日の合計</h3>
     <div class="sum" id="sum"></div>
@@ -408,8 +408,10 @@ const hm = m => `${Math.floor(m/60)}:${pad(m%60)}`;
 const durTxt = m => { const h=Math.floor(m/60), r=m%60; return h ? (r ? `${h}時間${r}分` : `${h}時間`) : `${r}分`; };
 const newId = () => Math.random().toString(36).slice(2,10);
 const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
-const snap = m => Math.round(m/5)*5;
-const floor5 = m => Math.floor(m/5)*5;
+const STEP = 10;                                  // minutes per grid step
+const snap = m => Math.round(m/STEP)*STEP;
+const floor5 = m => Math.floor(m/STEP)*STEP;     // floor to the grid step
+const keep5 = m => Math.round(m/5)*5;            // stored data keeps its 5-min values
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
 const addDays = (s,n) => { const [y,m,d]=s.split('-').map(Number); const t=new Date(y,m-1,d+n); return `${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())}`; };
@@ -444,7 +446,7 @@ let lastColor = 'blue';
 function sanitizeEvents(a){
   if (!Array.isArray(a)) return [];
   return a.filter(e => e && Number.isFinite(e.start) && Number.isFinite(e.end)).map(e => {
-    const start = clamp(floor5(e.start),0,1435), end = clamp(snap(e.end), start+5, 1440);
+    const start = clamp(Math.floor(e.start/5)*5,0,1435), end = clamp(keep5(e.end), start+5, 1440);
     return {id: typeof e.id==='string' && e.id ? e.id.slice(0,40) : newId(), title: typeof e.title==='string' ? e.title.slice(0,100) : '',
       start, end, color: COLORS[e.color] ? e.color : 'gray', memo: typeof e.memo==='string' ? e.memo.slice(0,2000) : ''};
   });
@@ -454,7 +456,7 @@ function sanitizePalette(p){
   const arr = Array.isArray(p) ? p : (p && Array.isArray(p.items) ? p.items : null);
   if (!arr) return null;
   return arr.filter(x => x && typeof x.name==='string').map(x => ({id: typeof x.id==='string' && x.id ? x.id : newId(), name:x.name.slice(0,40),
-    color: COLORS[x.color] ? x.color : 'gray', dur: clamp(snap(Number(x.dur)||30),5,1440), memo: typeof x.memo==='string' ? x.memo.slice(0,2000) : ''}));
+    color: COLORS[x.color] ? x.color : 'gray', dur: clamp(keep5(Number(x.dur)||30),5,1440), memo: typeof x.memo==='string' ? x.memo.slice(0,2000) : ''}));
 }
 
 // ---------- cloud store (claude db) ----------
@@ -715,13 +717,12 @@ function onBodyDown(e, k){
   if (e.button !== 0) return;
   const evNode = e.target.closest('.ev');
   if (evNode && evNode.dataset.id) {
-    const mode = e.target.classList.contains('a') ? 'top' : e.target.classList.contains('b') ? 'bot' : 'move';
-    startEvDrag(e, k, evNode.dataset.id, mode);
+    evPress(e, k, evNode.dataset.id);
   } else startCreate(e, k);
 }
 
 function startCreate(e, k){
-  const m0 = clamp(floor5(minAt(e.clientY)), 0, 1435);
+  const m0 = clamp(floor5(minAt(e.clientY)), 0, 1440 - STEP);
   const x0 = e.clientX, y0 = e.clientY, t0 = Date.now();
   const hadSel = sel.size > 0;
   if (e.pointerType === 'touch') {
@@ -740,8 +741,8 @@ function startCreate(e, k){
     if (!drag.moved && Math.hypot(ev.clientX-x0, ev.clientY-y0) < 4) return;
     drag.moved = true;
     const m = minAt(ev.clientY);
-    const lo = clamp(Math.min(m0, floor5(m)), 0, 1435);
-    const hi = clamp(Math.max(m0 + 5, Math.ceil(m/5)*5), lo + 5, 1440);
+    const lo = clamp(Math.min(m0, floor5(m)), 0, 1440 - STEP);
+    const hi = clamp(Math.max(m0 + STEP, Math.ceil(m/STEP)*STEP), lo + STEP, 1440);
     drag.ghost = {kind:k, start:lo, end:hi, title:'', color:lastColor};
     renderCol(k);
   };
@@ -763,51 +764,27 @@ function createAndEdit(k, s, en){
   openEditor(k, ev.id, true);
 }
 
-function startEvDrag(e, k, id, mode){
-  e.preventDefault(); e.stopPropagation();
-  const ev = findEv(k, id); if (!ev) return;
-  const x0 = e.clientX, y0 = e.clientY;
-  const orig = {start:ev.start, end:ev.end};
-  const offset = minAt(e.clientY) - ev.start;
+// Written items stay put: a tap selects, a second tap opens the editor.
+// No dragging, so a stray touch or a scroll that starts on an item can't move it.
+function evPress(e, k, id){
   const key = k + ':' + id, wasSel = sel.has(key), additive = e.shiftKey || e.metaKey || e.ctrlKey;
-  drag = {type:mode, kind:k, id, moved:false, ghost:null, target:k};
-  hideHover();
-  const move = p => {
-    if (!drag.moved && Math.hypot(p.clientX-x0, p.clientY-y0) < 4) return;
-    if (!drag.moved) { drag.moved = true; pushUndo(); if (!wasSel) { sel.clear(); sel.add(key); } }
-    const m = minAt(p.clientY);
-    if (mode === 'move') {
-      const len = orig.end - orig.start;
-      const s = clamp(snap(m - offset), 0, 1440 - len);
-      const tk = kindAt(p.clientX, p.clientY) || drag.target || k;
-      drag.target = tk;
-      if (tk !== k) { ev.start = orig.start; ev.end = orig.end; drag.ghost = {kind:tk, start:s, end:s+len, title:ev.title, color:ev.color, memo:''}; }
-      else { drag.ghost = null; ev.start = s; ev.end = s + len; }
-    } else if (mode === 'top') ev.start = clamp(snap(m), 0, ev.end - 5);
-    else ev.end = clamp(snap(m), ev.start + 5, 1440);
-    KINDS.forEach(renderCol);
+  if (e.pointerType !== 'touch') e.preventDefault();
+  const x0 = e.clientX, y0 = e.clientY;
+  const done = () => { window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', done); };
+  const up = p => {
+    done();
+    if (Math.hypot(p.clientX - x0, p.clientY - y0) > 8) return;   // a swipe, not a tap
+    if (additive) { wasSel ? sel.delete(key) : sel.add(key); render(); return; }
+    if (wasSel && sel.size === 1) { render(); openEditor(k, id, false); return; }
+    sel.clear(); sel.add(key); render();
   };
-  const up = () => {
-    window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
-    const d = drag; drag = null;
-    if (!d.moved) {
-      if (additive) { wasSel ? sel.delete(key) : sel.add(key); render(); return; }
-      if (wasSel && sel.size === 1) { render(); openEditor(k, id, false); return; }
-      sel.clear(); sel.add(key); render(); return;
-    }
-    if (d.ghost && d.target !== k) {
-      S.day[d.target].push({id:newId(), title:ev.title, start:d.ghost.start, end:d.ghost.end, color:ev.color, memo:ev.memo});
-      toast(`${LABEL[d.target]}に写しました`);
-    } else if (ev.start === orig.start && ev.end === orig.end) S.undo.pop();
-    commit();
-  };
-  window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  window.addEventListener('pointerup', up); window.addEventListener('pointercancel', done);
 }
 
 function hoverMove(e, k){
   if (drag || e.pointerType === 'touch') return;
   const h = bodies[k].querySelector('.hover');
-  const m = clamp(floor5(minAt(e.clientY)), 0, 1435);
+  const m = clamp(floor5(minAt(e.clientY)), 0, 1440 - STEP);
   lastHover = {kind:k, min:m};
   if (e.target.closest('.ev')) { h.style.display = 'none'; return; }
   h.style.display = 'block'; h.style.top = (m/5*S.slot) + 'px';
@@ -888,7 +865,7 @@ $('#palette').addEventListener('pointerdown', e => {
 function quickRecord(item, kind){
   kind = kind === 'actual' ? 'actual' : 'plan';
   if (S.date !== todayStr()) { toast('今日以外の日は、ノートへドラッグして置いてください'); return false; }
-  const now = new Date(), s = clamp(floor5(now.getHours()*60 + now.getMinutes()), 0, 1435);
+  const now = new Date(), s = clamp(floor5(now.getHours()*60 + now.getMinutes()), 0, 1440 - STEP);
   pushUndo();
   const ev = {id:newId(), title:item.name, start:s, end:Math.min(1440, s + item.dur), color:item.color, memo:item.memo || ''};
   S.day[kind].push(ev); sel.clear();
@@ -934,12 +911,20 @@ $('#palette').addEventListener('click', e => {
 
 // ---------- event editor ----------
 const hourOpts = max => { let h = ''; for (let i = 0; i <= max; i++) h += `<option value="${i}">${i}時</option>`; return h; };
-const minOpts = (() => { let h = ''; for (let m = 0; m < 60; m += 5) h += `<option value="${m}">${pad(m)}分</option>`; return h; })();
+const minOpts = (() => { let h = ''; for (let m = 0; m < 60; m += STEP) h += `<option value="${m}">${pad(m)}分</option>`; return h; })();
 $('#fStartH').innerHTML = hourOpts(23); $('#fEndH').innerHTML = hourOpts(24);
 $('#fStartM').innerHTML = minOpts; $('#fEndM').innerHTML = minOpts;
 const getT = id => +$('#' + id + 'H').value * 60 + +$('#' + id + 'M').value;
 function syncEnd24(){ const is24 = +$('#fEndH').value === 24; if (is24) $('#fEndM').value = 0; $('#fEndM').disabled = is24; }
-function setT(id, m){ $('#' + id + 'H').value = Math.floor(m/60); $('#' + id + 'M').value = m % 60; syncEnd24(); }
+function ensureOpt(sel, v, label){
+  if ([...sel.options].some(o => +o.value === v)) return;
+  const o = new Option(label, v); const next = [...sel.options].find(x => +x.value > v); sel.insertBefore(o, next || null);
+}
+function setT(id, m){
+  $('#' + id + 'H').value = Math.floor(m/60);
+  ensureOpt($('#' + id + 'M'), m % 60, pad(m % 60) + '分');   // older 5-min data
+  $('#' + id + 'M').value = m % 60; syncEnd24();
+}
 function swatches(container, onPick){
   const NAMES = {blue:'水色',green:'緑',yellow:'黄',orange:'オレンジ',red:'ピンク',purple:'紫',teal:'青緑',gray:'グレー'};
   container.innerHTML = Object.keys(COLORS).map(c => `<button type="button" class="sw" data-c="${c}" style="--f:${COLORS[c][1]};background:${COLORS[c][1]}" aria-label="${NAMES[c]}" title="${NAMES[c]}"></button>`).join('');
@@ -1050,7 +1035,7 @@ $('#evDlg').addEventListener('pointerdown', e => { if (e.target.id === 'evDlg') 
 $('#fTitle').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); if (saveEditor()) closeEditor(); } });
 
 // ---------- palette object editor ----------
-const durOpts = (() => { let h = ''; for (let m = 5; m <= 480; m += 5) h += `<option value="${m}">${durTxt(m)}</option>`; return h; })();
+const durOpts = (() => { let h = ''; for (let m = STEP; m <= 480; m += STEP) h += `<option value="${m}">${durTxt(m)}</option>`; return h; })();
 $('#oDur').innerHTML = durOpts;
 let oed = null;
 function setOColor(c){ oed.color = c; document.querySelectorAll('#oColors .sw').forEach(b => b.classList.toggle('on', b.dataset.c === c)); }
@@ -1060,6 +1045,7 @@ function openObj(id){
   oed = {id: p ? p.id : null, color: p ? p.color : 'blue'};
   $('#objH').textContent = p ? 'よく使う予定を直す' : 'よく使う予定を追加';
   $('#oName').value = p ? p.name : '';
+  if (p) ensureOpt($('#oDur'), Math.min(480, p.dur), durTxt(Math.min(480, p.dur)));
   $('#oDur').value = p ? Math.min(480, p.dur) : 30;
   $('#oMemo').value = p ? (p.memo || '') : '';
   $('#oDel').style.display = p ? '' : 'none';
@@ -1156,7 +1142,7 @@ document.addEventListener('keydown', e => {
   else if (mod && key === 'a') { e.preventDefault(); selectAll(); }
   else if (e.key === 'Enter' && sel.size === 1) { e.preventDefault(); const [k, id] = [...sel][0].split(':'); openEditor(k, id, false); }
   else if (e.key === 'Escape' && sel.size) { sel.clear(); render(); }
-  else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && sel.size) { e.preventDefault(); nudge((e.key === 'ArrowUp' ? -1 : 1) * (e.shiftKey ? 15 : 5)); }
+  else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && sel.size) { e.preventDefault(); nudge((e.key === 'ArrowUp' ? -1 : 1) * (e.shiftKey ? 30 : STEP)); }
   else if (e.key === 'ArrowLeft' && !mod) go(addDays(S.date, -1));
   else if (e.key === 'ArrowRight' && !mod) go(addDays(S.date, 1));
 });
@@ -1314,7 +1300,7 @@ $('#keys').innerHTML = [
   [`<kbd>${MOD}C</kbd> <kbd>${MOD}V</kbd>`, 'コピー・カーソル位置に貼る'],
   [`<kbd>${MOD}X</kbd>`, '切り取り'],
   [`<kbd>${MOD}D</kbd>`, 'すぐ後ろに複製'],
-  ['<kbd>↑</kbd> <kbd>↓</kbd>', '5分ずらす（Shiftで15分）'],
+  ['<kbd>↑</kbd> <kbd>↓</kbd>', '10分ずらす（Shiftで30分）'],
   ['<kbd>Shift</kbd>+クリック', '複数を選ぶ'],
   [`<kbd>${MOD}Z</kbd>`, '元に戻す'],
 ].map(([k, d]) => `<dt>${k}</dt><dd>${d}</dd>`).join('');
